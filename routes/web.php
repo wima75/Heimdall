@@ -11,8 +11,12 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\UserController;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -109,3 +113,45 @@ Route::resource('api/item', ItemRestController::class);
 Route::get('import', ImportController::class)->name('items.import');
 
 Route::get('/health', HealthController::class)->name('health');
+
+Route::get('/bing-bg.jpg', function () {
+    $json = Cache::get('bing_bg_json');
+
+    if (!$json) {
+        $json = Http::get('https://www.bing.com/HPImageArchive.aspx', [
+            'format' => 'js', 'idx' => 0, 'n' => 1, 'mkt' => 'de-CH',
+        ])->json();
+
+        $image = $json['images'][0];
+
+        // Uhrzeit aus fullstartdate extrahieren (z.B. "0700" aus "202605010700")
+        $time = substr($image['fullstartdate'], 8, 4);
+
+        // Nächster Bildwechsel: enddate + diese Uhrzeit (UTC)
+        $expiresAt = Carbon::createFromFormat('YmdHi', $image['enddate'] . $time, 'UTC');
+
+        // Sicherheitsnetze
+        $now = Carbon::now('UTC');
+        if ($expiresAt->lessThanOrEqualTo($now)) {
+            // Wechselzeitpunkt liegt schon in der Vergangenheit -> kurz cachen, gleich nochmal probieren
+            $expiresAt = $now->copy()->addMinutes(10);
+        } elseif ($expiresAt->diffInHours($now) > 24) {
+            // Falls etwas Komisches im JSON steht, max. 24h cachen
+            $expiresAt = $now->copy()->addHours(24);
+        }
+
+        Cache::put('bing_bg_json', $json, $expiresAt);
+        // Altes Bild wegwerfen, wenn JSON neu geladen wurde
+        Cache::forget('bing_bg_img');
+    }
+
+    $url = 'https://www.bing.com' . $json['images'][0]['url'];
+
+    $img = Cache::remember('bing_bg_img', Carbon::now('UTC')->addHours(24), fn() =>
+        Http::get($url)->body()
+    );
+
+    return response($img)
+        ->header('Content-Type', 'image/jpeg')
+        ->header('Cache-Control', 'public, max-age=3600');
+});
