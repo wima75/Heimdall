@@ -150,5 +150,10 @@
         /* editable using the 'Settings > Advanced > Custom JavaScript' option */
         {!! \App\Setting::fetch('custom_js') !!}
         </script>
+
+        @include('partials.bing-info')
+        <link rel="stylesheet" href="{{ asset('css/bing-info.css') }}?v={{ filemtime(public_path('css/bing-info.css')) }}">
+        <script src="{{ asset('js/bing-info.js') }}?v={{ filemtime(public_path('js/bing-info.js')) }}" defer></script>
+
     </body>
 </html>

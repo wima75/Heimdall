@@ -113,40 +113,18 @@ Route::get('import', ImportController::class)->name('items.import');
 
 Route::get('/health', HealthController::class)->name('health');
 
-Route::get('/bing-bg.jpg', function () {
-    $json = Cache::get('bing_bg_json');
+// Hintergrundbild (heute oder älter via ?idx=0..7)
+Route::get('/bing-bg.jpg', function (\Illuminate\Http\Request $request) {
+    $idx = max(0, min(7, (int) $request->query('idx', 0)));
+    $json = getBingJson($idx);
 
-    if (!$json) {
-        $json = Http::get('https://www.bing.com/HPImageArchive.aspx', [
-            'format' => 'js', 'idx' => 0, 'n' => 1, 'mkt' => 'de-CH',
-        ])->json();
+    if (!$json || empty($json['images'][0])) abort(404);
 
-        $image = $json['images'][0];
+    $image = $json['images'][0];
+    $url   = 'https://www.bing.com' . $image['url'];
 
-        // Uhrzeit aus fullstartdate extrahieren (z.B. "0700" aus "202605010700")
-        $time = substr($image['fullstartdate'], 8, 4);
-
-        // Nächster Bildwechsel: enddate + diese Uhrzeit (UTC)
-        $expiresAt = Carbon::createFromFormat('YmdHi', $image['enddate'] . $time, 'UTC');
-
-        // Sicherheitsnetze
-        $now = Carbon::now('UTC');
-        if ($expiresAt->lessThanOrEqualTo($now)) {
-            // Wechselzeitpunkt liegt schon in der Vergangenheit -> kurz cachen, gleich nochmal probieren
-            $expiresAt = $now->copy()->addMinutes(10);
-        } elseif ($expiresAt->diffInHours($now) > 24) {
-            // Falls etwas Komisches im JSON steht, max. 24h cachen
-            $expiresAt = $now->copy()->addHours(24);
-        }
-
-        Cache::put('bing_bg_json', $json, $expiresAt);
-        // Altes Bild wegwerfen, wenn JSON neu geladen wurde
-        Cache::forget('bing_bg_img');
-    }
-
-    $url = 'https://www.bing.com' . $json['images'][0]['url'];
-
-    $img = Cache::remember('bing_bg_img', Carbon::now('UTC')->addHours(24), fn() =>
+    $imgCacheKey = 'bing_bg_img_' . $image['startdate'];
+    $img = Cache::remember($imgCacheKey, now()->addDays(10), fn() =>
         Http::get($url)->body()
     );
 
@@ -154,3 +132,66 @@ Route::get('/bing-bg.jpg', function () {
         ->header('Content-Type', 'image/jpeg')
         ->header('Cache-Control', 'public, max-age=3600');
 });
+
+// JSON-Infos zum Bild (heute oder älter via ?idx=0..7)
+Route::get('/bing-info', function (\Illuminate\Http\Request $request) {
+    $idx = max(0, min(7, (int) $request->query('idx', 0)));
+    $json = getBingJson($idx);
+
+    if (!$json || empty($json['images'][0])) {
+        return response()->json(['error' => 'no data'], 404);
+    }
+
+    $img = $json['images'][0];
+
+    return response()->json([
+        'idx'           => $idx,
+        'maxIdx'        => 7,
+        'title'         => $img['title']          ?? '',
+        'copyright'     => $img['copyright']      ?? '',
+        'copyrightlink' => isset($img['copyrightlink'])
+            ? (str_starts_with($img['copyrightlink'], 'http')
+                ? $img['copyrightlink']
+                : 'https://www.bing.com' . $img['copyrightlink'])
+            : null,
+        'fullstartdate' => $img['fullstartdate']  ?? '',
+        'startdate'     => $img['startdate']      ?? '',
+        'imageUrl'      => url('/bing-bg.jpg?idx=' . $idx . '&v=' . ($img['startdate'] ?? '')),
+    ])->header('Cache-Control', 'public, max-age=600');
+});
+
+// Helper: holt das JSON für einen idx, gecached bis zum nächsten Bildwechsel
+if (!function_exists('getBingJson')) {
+    function getBingJson(int $idx): ?array {
+        $cacheKey = 'bing_bg_json_' . $idx;
+        $json = Cache::get($cacheKey);
+
+        if (!$json) {
+            // https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=de-CH
+            $json = Http::get('https://www.bing.com/HPImageArchive.aspx', [
+                'format' => 'js', 'idx' => $idx, 'n' => 1, 'mkt' => 'de-CH',
+            ])->json();
+
+            if (empty($json['images'][0])) return null;
+
+            $image = $json['images'][0];
+
+            $now = Carbon::now('UTC');
+            if ($idx > 0) {
+                $expiresAt = $now->copy()->addDays(7);
+            } else {
+                $time  = substr($image['fullstartdate'], 8, 4);
+                $expiresAt = Carbon::createFromFormat('YmdHi', $image['enddate'] . $time, 'UTC');
+                if ($expiresAt->lessThanOrEqualTo($now)) {
+                    $expiresAt = $now->copy()->addMinutes(10);
+                } elseif ($expiresAt->diffInHours($now) > 24) {
+                    $expiresAt = $now->copy()->addHours(24);
+                }
+            }
+
+            Cache::put($cacheKey, $json, $expiresAt);
+        }
+
+        return $json;
+    }
+}
