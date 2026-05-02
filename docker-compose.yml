@@ -1,0 +1,23 @@
+services:
+  heimdall-dev:
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: heimdall-dev-env
+    user: "1001:1001"
+    environment:
+      - HOME=/tmp
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    command: >
+      bash -c "
+      git config --global --add safe.directory /app &&
+      echo 'Installiere Abhängigkeiten...' &&
+      composer install &&
+      touch database/database.sqlite &&
+      php artisan key:generate &&
+      php artisan migrate &&
+      echo 'Starte Entwickler-Server...' &&
+      php artisan serve --host=0.0.0.0 --port=8000"
