@@ -3,6 +3,12 @@
 ## Local Dev Setup
 docker compose up --build
 
+## Publish
+Neuen Release erstellen
+docker-publish starten (https://github.com/wima75/docker-heimdall/actions/runs/25223882303)
+In Portainer Container recreate mit re-pull image
+
+
 
 [![Heimdall_Banner](https://i.imgur.com/iuV8w3y.png)](https://heimdall.site)
 
