@@ -1,20 +1,27 @@
 (function() {
     let currentIdx = 0;
     let maxIdx = 7;
+    let focusMode = false;
 
     const elInfo   = document.getElementById('bingInfo');
     const elToggle = document.getElementById('bingInfoToggle');
     const elTitle  = document.getElementById('bingTitle');
     const elCopy   = document.getElementById('bingCopyright');
-    const elDate   = document.getElementById('bingDate');
+    const elFocus  = document.getElementById('bingFocus');
+    const elMain   = document.getElementById('main');
     const elPrev   = document.getElementById('bingPrev');
     const elNext   = document.getElementById('bingNext');
     const elApp    = document.getElementById('app');
 
-    function formatDate(s) {
-        if (!s) return '';
-        const y = s.substr(0,4), m = s.substr(4,2), d = s.substr(6,2);
-        return `${d}.${m}.${y}`;
+    function toggleFocus() {
+        focusMode = !focusMode;
+        elFocus.classList.toggle('active');
+
+        if (focusMode) {
+            elMain.style.display = 'none';
+        } else {
+            elMain.style.display = '';
+        }
     }
 
     async function load(idx) {
@@ -26,7 +33,6 @@
             elTitle.textContent = data.title || 'Bing Bild des Tages';
             elTitle.href = data.copyrightlink || '#';
             elCopy.textContent = data.copyright || '';
-            elDate.textContent = formatDate(data.fullstartdate || data.startdate);
             elPrev.disabled = idx >= maxIdx;
             elNext.disabled = idx <= 0;
 
@@ -55,6 +61,7 @@
 
     elInfo.addEventListener('mouseenter', showInfo);
     elInfo.addEventListener('mouseleave', scheduleHide);
+    elFocus.addEventListener('click', toggleFocus);
 
     // Fallback für Touch-Geräte
     elToggle.addEventListener('click', (e) => {

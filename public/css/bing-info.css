@@ -100,3 +100,27 @@
     font-size: 12px;
     opacity: 0.85;
 }
+
+.bing-focus-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: #fff;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.bing-focus-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.bing-focus-btn .show-image-exit { display: none; }
+.bing-focus-btn.active .show-image { display: none; }
+.bing-focus-btn.active .show-image-exit { display: inline; }
