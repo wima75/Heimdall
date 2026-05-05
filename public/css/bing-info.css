@@ -1,3 +1,12 @@
+#app {
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    width: 100%;
+    min-height: 100vh;
+    background-attachment: fixed !important; 
+}
+
 .bing-info {
     position: fixed;
     bottom: 15px;

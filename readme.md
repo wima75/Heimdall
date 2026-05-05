@@ -3,6 +3,9 @@
 ## Local Dev Setup
 docker compose up --build
 
+### Cache löschen
+docker exec heimdall-dev-env php artisan optimize:clear
+
 ## Publish
 Neuen Release erstellen
 docker-publish starten (https://github.com/wima75/docker-heimdall/actions/runs/25223882303)
